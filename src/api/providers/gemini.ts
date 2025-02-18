@@ -5,16 +5,15 @@ import { ApiHandlerOptions, geminiDefaultModelId, GeminiModelId, geminiModels, M
 import { convertAnthropicMessageToGemini } from "../transform/gemini-format"
 import { ApiStream } from "../transform/stream"
 
+const GEMINI_DEFAULT_TEMPERATURE = 0
+
 export class GeminiHandler implements ApiHandler, SingleCompletionHandler {
 	private options: ApiHandlerOptions
 	private client: GoogleGenerativeAI
 
 	constructor(options: ApiHandlerOptions) {
-		if (!options.geminiApiKey) {
-			throw new Error("API key is required for Google Gemini")
-		}
 		this.options = options
-		this.client = new GoogleGenerativeAI(options.geminiApiKey)
+		this.client = new GoogleGenerativeAI(options.geminiApiKey ?? "not-provided")
 	}
 
 	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
@@ -26,7 +25,7 @@ export class GeminiHandler implements ApiHandler, SingleCompletionHandler {
 			contents: messages.map(convertAnthropicMessageToGemini),
 			generationConfig: {
 				// maxOutputTokens: this.getModel().info.maxTokens,
-				temperature: 0,
+				temperature: this.options.modelTemperature ?? GEMINI_DEFAULT_TEMPERATURE,
 			},
 		})
 
@@ -63,7 +62,7 @@ export class GeminiHandler implements ApiHandler, SingleCompletionHandler {
 			const result = await model.generateContent({
 				contents: [{ role: "user", parts: [{ text: prompt }] }],
 				generationConfig: {
-					temperature: 0,
+					temperature: this.options.modelTemperature ?? GEMINI_DEFAULT_TEMPERATURE,
 				},
 			})
 

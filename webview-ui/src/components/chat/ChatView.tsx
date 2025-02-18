@@ -223,9 +223,9 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 								setEnableButtons(false)
 							}
 							break
+						case "api_req_finished":
 						case "task":
 						case "error":
-						case "api_req_finished":
 						case "text":
 						case "browser_action":
 						case "browser_action_result":
@@ -275,7 +275,12 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			return true
 		} else {
 			const lastApiReqStarted = findLast(modifiedMessages, (message) => message.say === "api_req_started")
-			if (lastApiReqStarted && lastApiReqStarted.text != null && lastApiReqStarted.say === "api_req_started") {
+			if (
+				lastApiReqStarted &&
+				lastApiReqStarted.text !== null &&
+				lastApiReqStarted.text !== undefined &&
+				lastApiReqStarted.say === "api_req_started"
+			) {
 				const cost = JSON.parse(lastApiReqStarted.text).cost
 				if (cost === undefined) {
 					// api request has not finished yet
@@ -542,6 +547,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			switch (message.say) {
 				case "api_req_finished": // combineApiRequests removes this from modifiedMessages anyways
 				case "api_req_retried": // this message is used to update the latest api_req_started that the request was retried
+				case "api_req_deleted": // aggregated api_req metrics from deleted messages
 					return false
 				case "api_req_retry_delayed":
 					// Only show the retry message if it's the last message
@@ -718,9 +724,9 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 				if (message.say === "api_req_started") {
 					// get last api_req_started in currentGroup to check if it's cancelled. If it is then this api req is not part of the current browser session
 					const lastApiReqStarted = [...currentGroup].reverse().find((m) => m.say === "api_req_started")
-					if (lastApiReqStarted?.text != null) {
+					if (lastApiReqStarted?.text !== null && lastApiReqStarted?.text !== undefined) {
 						const info = JSON.parse(lastApiReqStarted.text)
-						const isCancelled = info.cancelReason != null
+						const isCancelled = info.cancelReason !== null && info.cancelReason !== undefined
 						if (isCancelled) {
 							endBrowserSession()
 							result.push(message)
@@ -873,7 +879,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 
 	const placeholderText = useMemo(() => {
 		const baseText = task ? "Type a message..." : "Type your task here..."
-		const contextText = "(@ to add context"
+		const contextText = "(@ to add context, / to switch modes"
 		const imageText = shouldDisableImages ? "" : ", hold shift to drag in images"
 		const helpText = imageText ? `\n${contextText}${imageText})` : `\n${contextText})`
 		return baseText + helpText
@@ -994,7 +1000,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 					}}>
 					{showAnnouncement && <Announcement version={version} hideAnnouncement={hideAnnouncement} />}
 					<div style={{ padding: "0 20px", flexShrink: 0 }}>
-						<h2>What can I do for you?</h2>
+						<h2>What can Roo do for you?</h2>
 						<p>
 							Thanks to the latest breakthroughs in agentic coding capabilities, I can handle complex
 							software development tasks step-by-step. With tools that let me create & edit files, explore
@@ -1116,6 +1122,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 					)}
 				</>
 			)}
+
 			<ChatTextArea
 				ref={textAreaRef}
 				inputValue={inputValue}
@@ -1135,6 +1142,8 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 				mode={mode}
 				setMode={setMode}
 			/>
+
+			<div id="chat-view-portal" />
 		</div>
 	)
 }

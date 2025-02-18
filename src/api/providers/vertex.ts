@@ -12,9 +12,9 @@ export class VertexHandler implements ApiHandler, SingleCompletionHandler {
 	constructor(options: ApiHandlerOptions) {
 		this.options = options
 		this.client = new AnthropicVertex({
-			projectId: this.options.vertexProjectId,
+			projectId: this.options.vertexProjectId ?? "not-provided",
 			// https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude#regions
-			region: this.options.vertexRegion,
+			region: this.options.vertexRegion ?? "us-east5",
 		})
 	}
 
@@ -22,7 +22,7 @@ export class VertexHandler implements ApiHandler, SingleCompletionHandler {
 		const stream = await this.client.messages.create({
 			model: this.getModel().id,
 			max_tokens: this.getModel().info.maxTokens || 8192,
-			temperature: 0,
+			temperature: this.options.modelTemperature ?? 0,
 			system: systemPrompt,
 			messages,
 			stream: true,
@@ -89,7 +89,7 @@ export class VertexHandler implements ApiHandler, SingleCompletionHandler {
 			const response = await this.client.messages.create({
 				model: this.getModel().id,
 				max_tokens: this.getModel().info.maxTokens || 8192,
-				temperature: 0,
+				temperature: this.options.modelTemperature ?? 0,
 				messages: [{ role: "user", content: prompt }],
 				stream: false,
 			})

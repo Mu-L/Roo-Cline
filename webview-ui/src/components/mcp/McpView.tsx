@@ -1,5 +1,6 @@
 import {
 	VSCodeButton,
+	VSCodeCheckbox,
 	VSCodeLink,
 	VSCodePanels,
 	VSCodePanelTab,
@@ -18,7 +19,13 @@ type McpViewProps = {
 }
 
 const McpView = ({ onDone }: McpViewProps) => {
-	const { mcpServers: servers, alwaysAllowMcp, mcpEnabled } = useExtensionState()
+	const {
+		mcpServers: servers,
+		alwaysAllowMcp,
+		mcpEnabled,
+		enableMcpServerCreation,
+		setEnableMcpServerCreation,
+	} = useExtensionState()
 
 	return (
 		<div
@@ -67,6 +74,27 @@ const McpView = ({ onDone }: McpViewProps) => {
 
 				{mcpEnabled && (
 					<>
+						<div style={{ marginBottom: 15 }}>
+							<VSCodeCheckbox
+								checked={enableMcpServerCreation}
+								onChange={(e: any) => {
+									setEnableMcpServerCreation(e.target.checked)
+									vscode.postMessage({ type: "enableMcpServerCreation", bool: e.target.checked })
+								}}>
+								<span style={{ fontWeight: "500" }}>Enable MCP Server Creation</span>
+							</VSCodeCheckbox>
+							<p
+								style={{
+									fontSize: "12px",
+									marginTop: "5px",
+									color: "var(--vscode-descriptionForeground)",
+								}}>
+								When enabled, Roo can help you create new MCP servers via commands like "add a new tool
+								to...". If you don't need to create MCP servers you can disable this to reduce Roo's
+								token usage.
+							</p>
+						</div>
+
 						{/* Server List */}
 						{servers.length > 0 && (
 							<div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -174,6 +202,13 @@ const ServerRow = ({ server, alwaysAllowMcp }: { server: McpServer; alwaysAllowM
 				<div
 					style={{ display: "flex", alignItems: "center", marginRight: "8px" }}
 					onClick={(e) => e.stopPropagation()}>
+					<VSCodeButton
+						appearance="icon"
+						onClick={handleRestart}
+						disabled={server.status === "connecting"}
+						style={{ marginRight: "8px" }}>
+						<span className="codicon codicon-refresh" style={{ fontSize: "14px" }}></span>
+					</VSCodeButton>
 					<div
 						role="switch"
 						aria-checked={!server.disabled}
@@ -355,14 +390,6 @@ const ServerRow = ({ server, alwaysAllowMcp }: { server: McpServer; alwaysAllowM
 								Maximum time to wait for server responses
 							</span>
 						</div>
-
-						<VSCodeButton
-							appearance="secondary"
-							onClick={handleRestart}
-							disabled={server.status === "connecting"}
-							style={{ width: "calc(100% - 14px)", margin: "0 7px 3px 7px" }}>
-							{server.status === "connecting" ? "Restarting..." : "Restart Server"}
-						</VSCodeButton>
 					</div>
 				)
 			)}

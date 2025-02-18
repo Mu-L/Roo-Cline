@@ -1,27 +1,31 @@
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useExtensionState } from "../../context/ExtensionStateContext"
 import { validateApiConfiguration } from "../../utils/validate"
 import { vscode } from "../../utils/vscode"
 import ApiOptions from "../settings/ApiOptions"
 
 const WelcomeView = () => {
-	const { apiConfiguration } = useExtensionState()
+	const { apiConfiguration, currentApiConfigName } = useExtensionState()
 
-	const [apiErrorMessage, setApiErrorMessage] = useState<string | undefined>(undefined)
-
-	const disableLetsGoButton = apiErrorMessage != null
+	const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined)
 
 	const handleSubmit = () => {
-		vscode.postMessage({ type: "apiConfiguration", apiConfiguration })
+		const error = validateApiConfiguration(apiConfiguration)
+		if (error) {
+			setErrorMessage(error)
+			return
+		}
+		setErrorMessage(undefined)
+		vscode.postMessage({
+			type: "upsertApiConfiguration",
+			text: currentApiConfigName,
+			apiConfiguration,
+		})
 	}
 
-	useEffect(() => {
-		setApiErrorMessage(validateApiConfiguration(apiConfiguration))
-	}, [apiConfiguration])
-
 	return (
-		<div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, padding: "0 20px" }}>
+		<div className="flex flex-col min-h-screen px-0 pb-5">
 			<h2>Hi, I'm Roo!</h2>
 			<p>
 				I can do all kinds of tasks thanks to the latest breakthroughs in agentic coding capabilities and access
@@ -32,11 +36,15 @@ const WelcomeView = () => {
 
 			<b>To get started, this extension needs an API provider.</b>
 
-			<div style={{ marginTop: "10px" }}>
-				<ApiOptions />
-				<VSCodeButton onClick={handleSubmit} disabled={disableLetsGoButton} style={{ marginTop: "3px" }}>
-					Let's go!
-				</VSCodeButton>
+			<div className="mt-3">
+				<ApiOptions fromWelcomeView />
+			</div>
+
+			<div className="sticky bottom-0 bg-[var(--vscode-editor-background)] py-3">
+				<div className="flex flex-col gap-1.5">
+					<VSCodeButton onClick={handleSubmit}>Let's go!</VSCodeButton>
+					{errorMessage && <span className="text-destructive">{errorMessage}</span>}
+				</div>
 			</div>
 		</div>
 	)

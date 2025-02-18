@@ -1,7 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
 import { ApiHandler, SingleCompletionHandler } from "../"
-import { ApiHandlerOptions, ModelInfo, UnboundModelId, unboundDefaultModelId, unboundModels } from "../../shared/api"
+import { ApiHandlerOptions, ModelInfo, unboundDefaultModelId, unboundDefaultModelInfo } from "../../shared/api"
 import { convertToOpenAiMessages } from "../transform/openai-format"
 import { ApiStream, ApiStreamUsageChunk } from "../transform/stream"
 
@@ -16,10 +16,9 @@ export class UnboundHandler implements ApiHandler, SingleCompletionHandler {
 
 	constructor(options: ApiHandlerOptions) {
 		this.options = options
-		this.client = new OpenAI({
-			baseURL: "https://api.getunbound.ai/v1",
-			apiKey: this.options.unboundApiKey,
-		})
+		const baseURL = "https://api.getunbound.ai/v1"
+		const apiKey = this.options.unboundApiKey ?? "not-provided"
+		this.client = new OpenAI({ baseURL, apiKey })
 	}
 
 	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
@@ -80,7 +79,7 @@ export class UnboundHandler implements ApiHandler, SingleCompletionHandler {
 				{
 					model: this.getModel().id.split("/")[1],
 					max_tokens: maxTokens,
-					temperature: 0,
+					temperature: this.options.modelTemperature ?? 0,
 					messages: openAiMessages,
 					stream: true,
 				},
@@ -130,15 +129,15 @@ export class UnboundHandler implements ApiHandler, SingleCompletionHandler {
 		}
 	}
 
-	getModel(): { id: UnboundModelId; info: ModelInfo } {
-		const modelId = this.options.apiModelId
-		if (modelId && modelId in unboundModels) {
-			const id = modelId as UnboundModelId
-			return { id, info: unboundModels[id] }
+	getModel(): { id: string; info: ModelInfo } {
+		const modelId = this.options.unboundModelId
+		const modelInfo = this.options.unboundModelInfo
+		if (modelId && modelInfo) {
+			return { id: modelId, info: modelInfo }
 		}
 		return {
 			id: unboundDefaultModelId,
-			info: unboundModels[unboundDefaultModelId],
+			info: unboundDefaultModelInfo,
 		}
 	}
 
@@ -147,7 +146,7 @@ export class UnboundHandler implements ApiHandler, SingleCompletionHandler {
 			const requestOptions: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 				model: this.getModel().id.split("/")[1],
 				messages: [{ role: "user", content: prompt }],
-				temperature: 0,
+				temperature: this.options.modelTemperature ?? 0,
 			}
 
 			if (this.getModel().id.startsWith("anthropic/")) {

@@ -130,11 +130,20 @@ describe("OpenAiNativeHandler", () => {
 			})
 
 			mockCreate.mockResolvedValueOnce({
-				choices: [{ message: { content: null } }],
-				usage: {
-					prompt_tokens: 0,
-					completion_tokens: 0,
-					total_tokens: 0,
+				[Symbol.asyncIterator]: async function* () {
+					yield {
+						choices: [
+							{
+								delta: { content: null },
+								index: 0,
+							},
+						],
+						usage: {
+							prompt_tokens: 0,
+							completion_tokens: 0,
+							total_tokens: 0,
+						},
+					}
 				},
 			})
 
@@ -144,18 +153,41 @@ describe("OpenAiNativeHandler", () => {
 				results.push(result)
 			}
 
-			expect(results).toEqual([
-				{ type: "text", text: "" },
-				{ type: "usage", inputTokens: 0, outputTokens: 0 },
-			])
+			expect(results).toEqual([{ type: "usage", inputTokens: 0, outputTokens: 0 }])
 
 			// Verify developer role is used for system prompt with o1 model
 			expect(mockCreate).toHaveBeenCalledWith({
 				model: "o1",
 				messages: [
-					{ role: "developer", content: systemPrompt },
+					{ role: "developer", content: "Formatting re-enabled\n" + systemPrompt },
 					{ role: "user", content: "Hello!" },
 				],
+				stream: true,
+				stream_options: { include_usage: true },
+			})
+		})
+
+		it("should handle o3-mini model family correctly", async () => {
+			handler = new OpenAiNativeHandler({
+				...mockOptions,
+				apiModelId: "o3-mini",
+			})
+
+			const stream = handler.createMessage(systemPrompt, messages)
+			const chunks: any[] = []
+			for await (const chunk of stream) {
+				chunks.push(chunk)
+			}
+
+			expect(mockCreate).toHaveBeenCalledWith({
+				model: "o3-mini",
+				messages: [
+					{ role: "developer", content: "Formatting re-enabled\n" + systemPrompt },
+					{ role: "user", content: "Hello!" },
+				],
+				stream: true,
+				stream_options: { include_usage: true },
+				reasoning_effort: "medium",
 			})
 		})
 	})
@@ -300,7 +332,7 @@ describe("OpenAiNativeHandler", () => {
 			expect(mockCreate).toHaveBeenCalledWith({
 				model: "o3-mini",
 				messages: [{ role: "user", content: "Test prompt" }],
-				temperature: 0,
+				reasoning_effort: "medium",
 			})
 		})
 

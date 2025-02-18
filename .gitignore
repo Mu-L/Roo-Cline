@@ -1,6 +1,6 @@
 dist
 out
-out-integration
+out-*
 node_modules
 coverage/
 
@@ -22,3 +22,9 @@ docs/_site/
 
 # Dotenv
 .env.integration
+
+#Local lint config
+.eslintrc.local.json
+
+#Logging
+logs

@@ -1,11 +1,20 @@
 import { mentionRegex } from "../../../src/shared/context-mentions"
 import { Fzf } from "fzf"
+import { ModeConfig } from "../../../src/shared/modes"
 
 export function insertMention(
 	text: string,
 	position: number,
 	value: string,
 ): { newValue: string; mentionIndex: number } {
+	// Handle slash command
+	if (text.startsWith("/")) {
+		return {
+			newValue: value,
+			mentionIndex: 0,
+		}
+	}
+
 	const beforeCursor = text.slice(0, position)
 	const afterCursor = text.slice(position)
 
@@ -48,12 +57,15 @@ export function removeMention(text: string, position: number): { newText: string
 }
 
 export enum ContextMenuOptionType {
+	OpenedFile = "openedFile",
 	File = "file",
 	Folder = "folder",
 	Problems = "problems",
+	Terminal = "terminal",
 	URL = "url",
 	Git = "git",
 	NoResults = "noResults",
+	Mode = "mode", // Add mode type
 }
 
 export interface ContextMenuQueryItem {
@@ -68,7 +80,42 @@ export function getContextMenuOptions(
 	query: string,
 	selectedType: ContextMenuOptionType | null = null,
 	queryItems: ContextMenuQueryItem[],
+	modes?: ModeConfig[],
 ): ContextMenuQueryItem[] {
+	// Handle slash commands for modes
+	if (query.startsWith("/")) {
+		const modeQuery = query.slice(1)
+		if (!modes?.length) return [{ type: ContextMenuOptionType.NoResults }]
+
+		// Create searchable strings array for fzf
+		const searchableItems = modes.map((mode) => ({
+			original: mode,
+			searchStr: mode.name,
+		}))
+
+		// Initialize fzf instance for fuzzy search
+		const fzf = new Fzf(searchableItems, {
+			selector: (item) => item.searchStr,
+		})
+
+		// Get fuzzy matching items
+		const matchingModes = modeQuery
+			? fzf.find(modeQuery).map((result) => ({
+					type: ContextMenuOptionType.Mode,
+					value: result.item.original.slug,
+					label: result.item.original.name,
+					description: result.item.original.roleDefinition.split("\n")[0],
+				}))
+			: modes.map((mode) => ({
+					type: ContextMenuOptionType.Mode,
+					value: mode.slug,
+					label: mode.name,
+					description: mode.roleDefinition.split("\n")[0],
+				}))
+
+		return matchingModes.length > 0 ? matchingModes : [{ type: ContextMenuOptionType.NoResults }]
+	}
+
 	const workingChanges: ContextMenuQueryItem = {
 		type: ContextMenuOptionType.Git,
 		value: "git-changes",
@@ -80,8 +127,14 @@ export function getContextMenuOptions(
 	if (query === "") {
 		if (selectedType === ContextMenuOptionType.File) {
 			const files = queryItems
-				.filter((item) => item.type === ContextMenuOptionType.File)
-				.map((item) => ({ type: ContextMenuOptionType.File, value: item.value }))
+				.filter(
+					(item) =>
+						item.type === ContextMenuOptionType.File || item.type === ContextMenuOptionType.OpenedFile,
+				)
+				.map((item) => ({
+					type: item.type,
+					value: item.value,
+				}))
 			return files.length > 0 ? files : [{ type: ContextMenuOptionType.NoResults }]
 		}
 
@@ -99,6 +152,7 @@ export function getContextMenuOptions(
 
 		return [
 			{ type: ContextMenuOptionType.Problems },
+			{ type: ContextMenuOptionType.Terminal },
 			{ type: ContextMenuOptionType.URL },
 			{ type: ContextMenuOptionType.Folder },
 			{ type: ContextMenuOptionType.File },
@@ -122,6 +176,9 @@ export function getContextMenuOptions(
 	}
 	if ("problems".startsWith(lowerQuery)) {
 		suggestions.push({ type: ContextMenuOptionType.Problems })
+	}
+	if ("terminal".startsWith(lowerQuery)) {
+		suggestions.push({ type: ContextMenuOptionType.Terminal })
 	}
 	if (query.startsWith("http")) {
 		suggestions.push({ type: ContextMenuOptionType.URL, value: query })
@@ -162,12 +219,16 @@ export function getContextMenuOptions(
 
 	// Separate matches by type
 	const fileMatches = matchingItems.filter(
-		(item) => item.type === ContextMenuOptionType.File || item.type === ContextMenuOptionType.Folder,
+		(item) =>
+			item.type === ContextMenuOptionType.File ||
+			item.type === ContextMenuOptionType.OpenedFile ||
+			item.type === ContextMenuOptionType.Folder,
 	)
 	const gitMatches = matchingItems.filter((item) => item.type === ContextMenuOptionType.Git)
 	const otherMatches = matchingItems.filter(
 		(item) =>
 			item.type !== ContextMenuOptionType.File &&
+			item.type !== ContextMenuOptionType.OpenedFile &&
 			item.type !== ContextMenuOptionType.Folder &&
 			item.type !== ContextMenuOptionType.Git,
 	)
@@ -192,6 +253,11 @@ export function getContextMenuOptions(
 }
 
 export function shouldShowContextMenu(text: string, position: number): boolean {
+	// Handle slash command
+	if (text.startsWith("/")) {
+		return position <= text.length && !text.includes(" ")
+	}
+
 	const beforeCursor = text.slice(0, position)
 	const atIndex = beforeCursor.lastIndexOf("@")
 
@@ -205,8 +271,9 @@ export function shouldShowContextMenu(text: string, position: number): boolean {
 	// Don't show the menu if it's a URL
 	if (textAfterAt.toLowerCase().startsWith("http")) return false
 
-	// Don't show the menu if it's a problems
-	if (textAfterAt.toLowerCase().startsWith("problems")) return false
+	// Don't show the menu if it's a problems or terminal
+	if (textAfterAt.toLowerCase().startsWith("problems") || textAfterAt.toLowerCase().startsWith("terminal"))
+		return false
 
 	// NOTE: it's okay that menu shows when there's trailing punctuation since user could be inputting a path with marks
 

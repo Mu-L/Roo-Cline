@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react"
 import { ContextMenuOptionType, ContextMenuQueryItem, getContextMenuOptions } from "../../utils/context-mentions"
 import { removeLeadingNonAlphanumeric } from "../common/CodeAccordian"
+import { ModeConfig } from "../../../../src/shared/modes"
 
 interface ContextMenuProps {
 	onSelect: (type: ContextMenuOptionType, value?: string) => void
@@ -10,6 +11,7 @@ interface ContextMenuProps {
 	setSelectedIndex: (index: number) => void
 	selectedType: ContextMenuOptionType | null
 	queryItems: ContextMenuQueryItem[]
+	modes?: ModeConfig[]
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -20,12 +22,13 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 	setSelectedIndex,
 	selectedType,
 	queryItems,
+	modes,
 }) => {
 	const menuRef = useRef<HTMLDivElement>(null)
 
 	const filteredOptions = useMemo(
-		() => getContextMenuOptions(searchQuery, selectedType, queryItems),
-		[searchQuery, selectedType, queryItems],
+		() => getContextMenuOptions(searchQuery, selectedType, queryItems, modes),
+		[searchQuery, selectedType, queryItems, modes],
 	)
 
 	useEffect(() => {
@@ -46,8 +49,29 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 
 	const renderOptionContent = (option: ContextMenuQueryItem) => {
 		switch (option.type) {
+			case ContextMenuOptionType.Mode:
+				return (
+					<div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+						<span style={{ lineHeight: "1.2" }}>{option.label}</span>
+						{option.description && (
+							<span
+								style={{
+									opacity: 0.5,
+									fontSize: "0.9em",
+									lineHeight: "1.2",
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+								}}>
+								{option.description}
+							</span>
+						)}
+					</div>
+				)
 			case ContextMenuOptionType.Problems:
 				return <span>Problems</span>
+			case ContextMenuOptionType.Terminal:
+				return <span>Terminal</span>
 			case ContextMenuOptionType.URL:
 				return <span>Paste URL to fetch contents</span>
 			case ContextMenuOptionType.NoResults:
@@ -74,6 +98,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 					return <span>Git Commits</span>
 				}
 			case ContextMenuOptionType.File:
+			case ContextMenuOptionType.OpenedFile:
 			case ContextMenuOptionType.Folder:
 				if (option.value) {
 					return (
@@ -100,12 +125,18 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 
 	const getIconForOption = (option: ContextMenuQueryItem): string => {
 		switch (option.type) {
+			case ContextMenuOptionType.Mode:
+				return "symbol-misc"
+			case ContextMenuOptionType.OpenedFile:
+				return "window"
 			case ContextMenuOptionType.File:
 				return "file"
 			case ContextMenuOptionType.Folder:
 				return "folder"
 			case ContextMenuOptionType.Problems:
 				return "warning"
+			case ContextMenuOptionType.Terminal:
+				return "terminal"
 			case ContextMenuOptionType.URL:
 				return "link"
 			case ContextMenuOptionType.Git:
@@ -171,15 +202,17 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 								overflow: "hidden",
 								paddingTop: 0,
 							}}>
-							<i
-								className={`codicon codicon-${getIconForOption(option)}`}
-								style={{
-									marginRight: "6px",
-									flexShrink: 0,
-									fontSize: "14px",
-									marginTop: 0,
-								}}
-							/>
+							{option.type !== ContextMenuOptionType.Mode && getIconForOption(option) && (
+								<i
+									className={`codicon codicon-${getIconForOption(option)}`}
+									style={{
+										marginRight: "6px",
+										flexShrink: 0,
+										fontSize: "14px",
+										marginTop: 0,
+									}}
+								/>
+							)}
 							{renderOptionContent(option)}
 						</div>
 						{(option.type === ContextMenuOptionType.File ||
@@ -192,8 +225,10 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 								/>
 							)}
 						{(option.type === ContextMenuOptionType.Problems ||
+							option.type === ContextMenuOptionType.Terminal ||
 							((option.type === ContextMenuOptionType.File ||
 								option.type === ContextMenuOptionType.Folder ||
+								option.type === ContextMenuOptionType.OpenedFile ||
 								option.type === ContextMenuOptionType.Git) &&
 								option.value)) && (
 							<i
