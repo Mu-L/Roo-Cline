@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react"
+import { convertHeadersToObject } from "./utils/headers"
 import { useDebounce } from "react-use"
 import { VSCodeLink } from "@vscode/webview-ui-toolkit/react"
 
@@ -9,6 +10,7 @@ import {
 	requestyDefaultModelId,
 	glamaDefaultModelId,
 	unboundDefaultModelId,
+	litellmDefaultModelId,
 } from "@roo/shared/api"
 
 import { vscode } from "@src/utils/vscode"
@@ -27,6 +29,7 @@ import {
 	Glama,
 	Groq,
 	LMStudio,
+	LiteLLM,
 	Mistral,
 	Ollama,
 	OpenAI,
@@ -84,25 +87,6 @@ const ApiOptions = ({
 	}, [apiConfiguration?.openAiHeaders, customHeaders])
 
 	// Helper to convert array of tuples to object (filtering out empty keys).
-	const convertHeadersToObject = (headers: [string, string][]): Record<string, string> => {
-		const result: Record<string, string> = {}
-
-		// Process each header tuple.
-		for (const [key, value] of headers) {
-			const trimmedKey = key.trim()
-
-			// Skip empty keys.
-			if (!trimmedKey) {
-				continue
-			}
-
-			// For duplicates, the last one in the array wins.
-			// This matches how HTTP headers work in general.
-			result[trimmedKey] = value.trim()
-		}
-
-		return result
-	}
 
 	// Debounced effect to update the main configuration when local
 	// customHeaders state stabilizes.
@@ -171,6 +155,8 @@ const ApiOptions = ({
 				vscode.postMessage({ type: "requestLmStudioModels", text: apiConfiguration?.lmStudioBaseUrl })
 			} else if (selectedProvider === "vscode-lm") {
 				vscode.postMessage({ type: "requestVsCodeLmModels" })
+			} else if (selectedProvider === "litellm") {
+				vscode.postMessage({ type: "requestRouterModels" })
 			}
 		},
 		250,
@@ -181,6 +167,8 @@ const ApiOptions = ({
 			apiConfiguration?.openAiApiKey,
 			apiConfiguration?.ollamaBaseUrl,
 			apiConfiguration?.lmStudioBaseUrl,
+			apiConfiguration?.litellmBaseUrl,
+			apiConfiguration?.litellmApiKey,
 			customHeaders,
 		],
 	)
@@ -233,6 +221,11 @@ const ApiOptions = ({
 						setApiConfigurationField("requestyModelId", requestyDefaultModelId)
 					}
 					break
+				case "litellm":
+					if (!apiConfiguration.litellmModelId) {
+						setApiConfigurationField("litellmModelId", litellmDefaultModelId)
+					}
+					break
 			}
 
 			setApiConfigurationField("apiProvider", value)
@@ -243,6 +236,7 @@ const ApiOptions = ({
 			apiConfiguration.glamaModelId,
 			apiConfiguration.unboundModelId,
 			apiConfiguration.requestyModelId,
+			apiConfiguration.litellmModelId,
 		],
 	)
 
@@ -393,6 +387,14 @@ const ApiOptions = ({
 
 			{selectedProvider === "chutes" && (
 				<Chutes apiConfiguration={apiConfiguration} setApiConfigurationField={setApiConfigurationField} />
+			)}
+
+			{selectedProvider === "litellm" && (
+				<LiteLLM
+					apiConfiguration={apiConfiguration}
+					setApiConfigurationField={setApiConfigurationField}
+					routerModels={routerModels}
+				/>
 			)}
 
 			{selectedProvider === "human-relay" && (
